@@ -36,9 +36,11 @@ Test your websocket at [here][Websocketking] after deploy
 - Example: wss://*******.execute-api.ap-northeast-1.amazonaws.com/dev?email=syamim_nsl@yahoo.com
 
 ## License
+
 MIT
 
 **Free Software, Syukran Alhamdulillah Thank to Allah!**
+
    [node.js]: <http://nodejs.org>
    [SAM CLI]: <https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html>
    [AWS CLI]: <https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html>
