@@ -1,0 +1,10 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "aws-serverless-websocket"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-v1jup8z23h79"
+s3_prefix = "aws-serverless-websocket"
+region = "ap-northeast-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"

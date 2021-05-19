@@ -1,0 +1,196 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  aws_serverless_websocket
+
+Transform:
+- AWS::Serverless-2016-10-31
+
+Resources:
+  # Role for Api
+  ApiRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: "apigateway.amazonaws.com"
+          Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "WebSocketInvokeLamba"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              Effect: Allow
+              Action: 
+                - lambda:InvokeFunction
+              Resource: "*"
+  
+  # create dynamoDB
+  WebSocketConnection: 
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: Email
+          AttributeType: S
+        - AttributeName: ConnectionID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: Email
+          KeyType: HASH # Hash Key
+        - AttributeName: ConnectionID
+          KeyType: RANGE # Sort Key
+      GlobalSecondaryIndexes:
+        - IndexName: "ConnectionID-Index"
+          KeySchema: 
+            - AttributeName: "ConnectionID"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+  
+  # create lambda
+  WebSocketConnected:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs12.x
+      Timeout: 15
+      MemorySize: 128
+      Handler: src/handlers/indexwebsocket.WebSocketConnected
+      Policies:
+      - Version: '2012-10-17' # Policy Document
+        Statement:
+        - Action: "*"
+          Effect: Allow
+          Resource: "*"
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          TABLE_WEBSOCKET_CONNECTION: !Ref WebSocketConnection
+  
+  # create lambda
+  WebSocketDisconnected:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs12.x
+      Timeout: 15
+      MemorySize: 128
+      Handler: src/handlers/indexwebsocket.WebSocketDisconnected
+      Policies:
+      - Version: '2012-10-17' # Policy Document
+        Statement:
+        - Action: "*"
+          Effect: Allow
+          Resource: "*"
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          TABLE_WEBSOCKET_CONNECTION: !Ref WebSocketConnection
+  
+  # create lambda
+  WebSocketInbound:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs12.x
+      Timeout: 15
+      MemorySize: 128
+      Handler: src/handlers/indexwebsocket.WebSocketInbound
+      Policies:
+      - Version: '2012-10-17' # Policy Document
+        Statement:
+        - Action: "*"
+          Effect: Allow
+          Resource: "*"
+      Environment:
+        Variables:
+          REGION: !Sub ${AWS::Region}
+          TABLE_WEBSOCKET_CONNECTION: !Ref WebSocketConnection
+  
+  # create API
+  WebSocketAPI:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: WebSocket_API
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: '$request.body.action'
+  
+  # integration route with lambda
+  ConnectRouteLambdaIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties: 
+      ApiId: !Ref WebSocketAPI
+      CredentialsArn: !GetAtt ApiRole.Arn
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketConnected.Arn}/invocations
+  
+  # integration route with lambda
+  DisconnectRouteLambdaIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties: 
+      ApiId: !Ref WebSocketAPI
+      CredentialsArn: !GetAtt ApiRole.Arn
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketDisconnected.Arn}/invocations
+  
+  # integration route with lambda
+  InboundRouteLambdaIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties: 
+      ApiId: !Ref WebSocketAPI
+      CredentialsArn: !GetAtt ApiRole.Arn
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketInbound.Arn}/invocations
+  
+  # create route
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    DependsOn:
+      - ConnectRouteLambdaIntegration
+    Properties: 
+      ApiId: !Ref WebSocketAPI
+      AuthorizationType: NONE
+      RouteKey: '$connect'
+      Target: !Sub 'integrations/${ConnectRouteLambdaIntegration}'
+
+  # create route  
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    DependsOn:
+      - DisconnectRouteLambdaIntegration
+    Properties: 
+      ApiId: !Ref WebSocketAPI
+      AuthorizationType: NONE
+      RouteKey: '$disconnect'
+      Target: !Sub 'integrations/${DisconnectRouteLambdaIntegration}'
+  
+  # create route
+  InboundRoute:
+    Type: AWS::ApiGatewayV2::Route
+    DependsOn:
+      - InboundRouteLambdaIntegration
+    Properties: 
+      ApiId: !Ref WebSocketAPI
+      AuthorizationType: NONE
+      RouteKey: 'inbound'
+      Target: !Sub 'integrations/${InboundRouteLambdaIntegration}'
+  
+  # api staging
+  WebSocketAPIStage:
+    Type: 'AWS::ApiGatewayV2::Stage'
+    Properties:
+      ApiId: !Ref WebSocketAPI
+      AutoDeploy: true
+      DeploymentId: !Ref WebSocketAPIDeployment
+      StageName: dev
+  
+  # api deployment
+  WebSocketAPIDeployment:
+    Type: 'AWS::ApiGatewayV2::Deployment'
+    DependsOn: 
+      - ConnectRoute
+      - DisconnectRoute
+      - InboundRoute
+    Properties:
+      ApiId: !Ref WebSocketAPI
+
