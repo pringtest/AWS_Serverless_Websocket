@@ -33,7 +33,7 @@ sam deploy --guided
 
 ## Test
 Test your websocket at [here][Websocketking] after deploy
-- Example: wss://*******.execute-api.ap-northeast-1.amazonaws.com/dev?email=syamim_nsl@yahoo.com
+- Example: `wss://*******.execute-api.ap-northeast-1.amazonaws.com/dev?email=syamim_nsl@yahoo.com`
 
 ## License
 
